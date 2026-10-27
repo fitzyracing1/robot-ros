@@ -106,3 +106,30 @@ def test_aisle_demo():
     assert all(r.lit and r.code == "0000" for r in brain.log)
     assert brain.suggest("aisle-setting")
     assert "tenet_level=" in out[-1]
+
+
+from robot_ros.gravity import simulate, analyze, G
+
+
+def test_gravity_level_at_rest():
+    g = analyze(simulate(0))
+    assert abs(sum(v * v for v in g["accel"]) ** 0.5 - G) < 1e-6
+    assert g["tilt_deg"] == 0 and g["is_level"] and g["load_g"] == 1.0
+
+
+def test_gravity_tilt_and_load():
+    g = analyze(simulate(15, payload_kg=5))
+    assert abs(g["tilt_deg"] - 15) < 0.01 and not g["is_level"] and abs(g["load_kg_est"] - 5) < 0.2
+    assert analyze(simulate(15), max_tilt_deg=20)["is_level"]
+
+
+def test_excess_tilt_is_dark_and_retries():
+    a, calls = seq([9, 9, 9])
+    r = Limiter().run("t", a, accel=simulate(12))
+    assert len(calls) == 3 and r.score < 7 and not r.lit and not r.level_lit
+
+
+def test_level_tilt_passes():
+    a, calls = seq([9, 1, 1])
+    r = Limiter().run("t", a, accel=simulate(5, noise=0.02))
+    assert r.tries == 1 and r.lit and r.gravity["is_level"]

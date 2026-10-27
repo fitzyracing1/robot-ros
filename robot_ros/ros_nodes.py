@@ -1,5 +1,5 @@
 """ROS 2 layer (rclpy). Topics:
-  /robot/sensors (std_msgs/String JSON job)   -> limiter_node
+  /robot/sensors (std_msgs/String JSON job + accel [ax,ay,az] m/s^2)   -> limiter_node
   /robot/lit_actions (std_msgs/String JSON)   -> brain_node
   /robot/motion (std_msgs/String JSON plan)   <- brain_node
 """
@@ -19,8 +19,14 @@ def sensor_main(args=None):
     rclpy.init(args=args)
     n = Node("sensor_node")
     pub = n.create_publisher(String, "/robot/sensors", 10)
+    from .gravity import simulate
+    n.declare_parameter("tilt_deg", 0.0)
     job = {"name": "aisle-setting", "cart_width": 2, "racks_needed": 4}
-    n.create_timer(2.0, lambda: pub.publish(String(data=json.dumps(job))))
+
+    def tick():
+        job["accel"] = list(simulate(n.get_parameter("tilt_deg").value, noise=0.02))  # gravity sense
+        pub.publish(String(data=json.dumps(job)))
+    n.create_timer(2.0, tick)
     rclpy.spin(n)
 
 
@@ -32,14 +38,17 @@ def limiter_main(args=None):
     rclpy.init(args=args)
     n = Node("limiter_node")
     n.declare_parameter("threshold", 7)
+    n.declare_parameter("max_tilt_deg", 10.0)
     pub = n.create_publisher(String, "/robot/lit_actions", 10)
     count = [0]
 
     def on_job(msg):
         job = json.loads(msg.data)
         count[0] += 1
-        res = Limiter(threshold=n.get_parameter("threshold").value).run(job["name"], make_attempt(job, count[0]))
-        n.get_logger().info(f"score={res.score} code={res.code} lit={res.lit}")
+        res = Limiter(threshold=n.get_parameter("threshold").value,
+                      max_tilt_deg=n.get_parameter("max_tilt_deg").value).run(
+            job["name"], make_attempt(job, count[0]), accel=job.get("accel"))
+        n.get_logger().info(f"score={res.score} code={res.code} lit={res.lit} gravity={res.gravity}")
         if res.lit:
             pub.publish(String(data=json.dumps({"task": res.task, "params": res.params,
                                                 "score": res.score, "code": res.code, "plan": res.plan})))

@@ -22,6 +22,13 @@ flowchart LR
 - **Code rule**: the robot writes its full plan before acting; an action with no plan is dark.
 - **First skill — aisle setting** (`aisle.py`): simulated store grid with movable racks; the robot proposes a layout, scores it, retries if low, and builds the `0000` layout.
 
+## Gravity sense
+`robot_ros/gravity.py` simulates an accelerometer at rest: gravity (~9.81 m/s^2) tilted by pitch/roll, plus optional payload and noise.
+`analyze(accel, max_tilt_deg=10)` gives `tilt_deg`, `load_g`, `load_kg_est` and `is_level`.
+`sensor_node` publishes `accel` with each job (param `tilt_deg`); `limiter_node` takes `max_tilt_deg` (default 10).
+Tilt over the limit is a dark self-check: the score is capped below threshold, the limiter retries, and the result stays dark.
+Sim: `python -c "from robot_ros import demo; demo.run(tilt_deg=14)"`.
+
 ## Sim demo (no ROS needed)
 ```bash
 python -m robot_ros.demo
