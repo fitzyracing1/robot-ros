@@ -1,0 +1,13 @@
+{
+  "_comment": "Light rules: hard-coded, read-only. The brain reads these and never writes them.",
+  "rules": [
+    "Only lit actions reach the brain.",
+    "Write the full plan before acting; act only when the plan is checked lit.",
+    "One try is good, three is better; never more than three.",
+    "Keep the best of the tries.",
+    "0000 means online: every tenet within its limit."
+  ],
+  "threshold": 7,
+  "max_tries": 3,
+  "plan_required": true
+}

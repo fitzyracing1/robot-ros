@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>robot_ros</name>
+  <version>0.1.0</version>
+  <description>ROS 2 feeds the limiter resulting in robot brain.</description>
+  <maintainer email="fitzyracing1@users.noreply.github.com">Joshua Almeida</maintainer>
+  <license>MIT</license>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <test_depend>python3-pytest</test_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>
