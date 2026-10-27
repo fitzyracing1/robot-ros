@@ -1,10 +1,17 @@
-"""Four tenets, 4-bit code: Cost, Bridge, Work, Theory (MSB->LSB).
-Active-low: 0 = within limit (lit), 1 = over limit (dark). 0000 = online."""
+"""The tenets of superintelligence: Cost, Bridge, Work, Theory (MSB->LSB).
+
+These are the bounds any superintelligence must stay inside. Each action is
+scored as an active-low 4-bit code: 0 = within the bound (lit), 1 = over the
+bound (dark). 0000 = online: every tenet lit.
+
+Growing tenet limits: a system earns more room only by staying lit, and one
+dark action tightens the bounds back a step."""
 from dataclasses import dataclass
 
 ORDER = ("cost", "bridge", "work", "theory")
 
-# Growing limits: level 0 is tight; each level loosens one step (bounded).
+# Growing tenet limits: level 0 is tight; each level loosens one step, bounded
+# at MAX_LEVEL. Room is earned by staying lit, never granted up front.
 LEVELS = [
     {"cost": 1.0, "bridge": 3, "work": 10, "theory": 0},
     {"cost": 2.0, "bridge": 4, "work": 15, "theory": 0},
@@ -36,7 +43,8 @@ def is_lit(c: str) -> bool:
 
 
 class TenetLevel:
-    """Grows after N consecutive lit, high-scoring actions; tightens one step on dark."""
+    """Tenet level of a superintelligence: grows one step after N consecutive lit,
+    high-scoring actions; one dark action tightens it back one step."""
 
     def __init__(self, grow_after: int = 5, high_score: int = 8, level: int = 0):
         self.grow_after, self.high_score, self.level, self.streak = grow_after, high_score, level, 0

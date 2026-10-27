@@ -1,1 +1,1 @@
-"""robot_ros: ROS 2 feeds the limiter resulting in robot brain."""
+"""robot_ros: ROS 2 -> limiter -> brain, bounded by the tenets of superintelligence."""
