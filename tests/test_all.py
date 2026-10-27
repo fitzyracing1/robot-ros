@@ -133,3 +133,60 @@ def test_level_tilt_passes():
     a, calls = seq([9, 1, 1])
     r = Limiter().run("t", a, accel=simulate(5, noise=0.02))
     assert r.tries == 1 and r.lit and r.gravity["is_level"]
+
+
+# --- real accelerometer wiring ---
+from robot_ros.gravity import from_vector, offset_from_samples, to_ms2
+from robot_ros.imu_source import ImuSource
+from robot_ros.mpu6050 import raw_to_ms2
+
+
+def test_vector_tilt_real_style_samples():
+    # level board, slight bias like a cheap MPU-6050
+    g = from_vector((0.12, -0.08, 9.79))
+    assert g["tilt_deg"] < 1.0 and g["is_level"] and abs(g["load_g"] - 1) < 0.01
+    # tipped ~20 deg about y: ax = -g sin20, az = g cos20
+    g = from_vector((-3.355, 0.02, 9.218))
+    assert abs(g["tilt_deg"] - 20) < 0.2 and not g["is_level"]
+    # same reading reported in g units
+    assert abs(from_vector((0.0, 0.0, 1.0), units="g")["load_g"] - 1) < 1e-6
+    assert to_ms2((1, 0, 0), "g")[0] == G
+
+
+def test_calibration_offset():
+    samples = [(0.30, -0.20, 9.95), (0.32, -0.18, 9.97), (0.28, -0.22, 9.93)]
+    off = offset_from_samples(samples)
+    g = from_vector((0.30, -0.20, 9.95), offset=off)
+    assert g["tilt_deg"] < 0.01 and abs(g["load_g"] - 1) < 1e-3
+
+
+def test_mpu6050_raw_conversion():
+    assert raw_to_ms2(bytes([0, 0, 0, 0, 0x40, 0]))[2] == G      # +16384 = 1 g
+    assert raw_to_ms2(bytes([0xC0, 0, 0, 0, 0, 0]))[0] == -G     # -16384
+
+
+def test_imu_detected_then_stale_is_dark():
+    logs = []
+    s = ImuSource("auto", detect_timeout_s=3, stale_ms=500, log=logs.append)
+    s.on_imu(0.0, 0.0, 9.81, now=0.5)
+    a, ok, mode = s.read(now=0.7)
+    assert ok and mode == "imu" and a[2] == 9.81 and "real IMU" in logs[0]
+    a, ok, mode = s.read(now=1.2)  # 700 ms since last message
+    assert not ok and a is None and mode == "imu"
+    r = Limiter().run("t", seq([9, 9, 9])[0], accel=a, sensor_ok=ok)
+    assert not r.lit and not r.level_lit
+
+
+def test_imu_required_never_arrives_is_dark():
+    a, ok, mode = ImuSource("imu", log=lambda m: None).read(now=10)
+    assert not ok and mode == "imu"
+
+
+def test_fallback_to_sim_logged():
+    logs = []
+    s = ImuSource("auto", detect_timeout_s=3, log=logs.append)
+    assert s.read(now=1)[1] is False                   # still waiting for IMU
+    a, ok, mode = s.read(now=3.1)
+    assert ok and mode == "sim" and "FALLING BACK TO SIM" in logs[0]
+    assert Limiter().run("t", seq([9, 1, 1])[0], accel=a, sensor_ok=ok).lit
+    assert ImuSource("sim").read(now=0)[2] == "sim"
