@@ -22,6 +22,18 @@ flowchart LR
 - **Code rule**: the robot writes its full plan before acting; an action with no plan is dark.
 - **First skill — aisle setting** (`aisle.py`): simulated store grid with movable racks; the robot proposes a layout, scores it, retries if low, and builds the `0000` layout.
 
+## Gravity sense
+`robot_ros/gravity.py` simulates an accelerometer at rest: gravity (~9.81 m/s^2) tilted by pitch/roll, plus optional payload and noise.
+`analyze(accel, max_tilt_deg=10)` gives `tilt_deg`, `load_g`, `load_kg_est` and `is_level`.
+`sensor_node` publishes `accel` with each job (param `tilt_deg`); `limiter_node` takes `max_tilt_deg` (default 10).
+Tilt over the limit is a dark self-check: the score is capped below threshold, the limiter retries, and the result stays dark.
+Real accelerometer: `sensor_node` subscribes to `sensor_msgs/msg/Imu` on `imu_topic` (default `/imu/data`).
+`source` = `imu` | `sim` | `auto` (default: imu if a message arrives within 3 s, else falls back to sim and logs it).
+If IMU data goes stale (no message for `imu_stale_ms`, default 500), the self-check is dark.
+`accel_offset` sets a calibration bias; `gravity.from_vector()` gives the same tilt/load/is_level for any (ax, ay, az).
+Wiring, driver packages and calibration: [docs/HARDWARE.md](docs/HARDWARE.md) (untested on physical hardware so far).
+Sim: `python -c "from robot_ros import demo; demo.run(tilt_deg=14)"`.
+
 ## Sim demo (no ROS needed)
 ```bash
 python -m robot_ros.demo
@@ -43,6 +55,6 @@ ros2 topic echo /robot/motion
 ```
 
 ## CI
-`sim` job: pure-Python tests + demo on ubuntu. `ros2-jazzy` job: `ros:jazzy` container, colcon build, rclpy import, tests.
+`sim` job: pure-Python tests + demo on ubuntu. `ros2-jazzy` job: `ros:jazzy` container, colcon build, rclpy import, tests (including one that publishes a fake `sensor_msgs/Imu` and checks `sensor_node` consumes it).
 
 License: MIT © 2026 Joshua Almeida
